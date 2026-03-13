@@ -5,5 +5,5 @@ langchain-openai
 openai
 langgraph
 plotly
-pbixray
 pandas
+python-dotenv
