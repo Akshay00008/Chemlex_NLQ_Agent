@@ -1,0 +1,9 @@
+streamlit
+langchain
+langchain-community
+langchain-openai
+openai
+langgraph
+plotly
+pbixray
+pandas
