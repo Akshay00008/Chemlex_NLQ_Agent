@@ -15,7 +15,7 @@ from nlq_agent import create_agent, run_query, DB_PATH, SCHEMA_DESCRIPTION
 # ── Page Config ──────────────────────────────────────────────────────────────
 
 st.set_page_config(
-    page_title="Chemlix Inventory NLQ Agent",
+    page_title="Chemlex Inventory NLQ Agent",
     page_icon="🏭",
     layout="wide",
     initial_sidebar_state="expanded",
@@ -222,7 +222,7 @@ with st.sidebar:
 
 # ── Main Content ─────────────────────────────────────────────────────────────
 
-st.markdown('<p class="main-header">Chemlix Inventory NLQ Agent</p>', unsafe_allow_html=True)
+st.markdown('<p class="main-header">Chemlex Inventory NLQ Agent</p>', unsafe_allow_html=True)
 st.markdown(
     '<p class="sub-header">Ask questions about your inventory data in plain English</p>',
     unsafe_allow_html=True,
