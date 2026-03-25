@@ -12,8 +12,9 @@ dist/
 build/
 *.egg
 
-# Data files (large)
+# Data files (large) - keep inventory_data.db for deployment
 *.pbix
+*.xlsx
 pbix_extracted/
 pbix_schema.json
 

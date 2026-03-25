@@ -1,7 +1,6 @@
 """
 Streamlit frontend for the Inventory NLQ Agent.
 Provides an interactive chat interface to query inventory data using natural language.
-Compatible with Streamlit 1.12+.
 """
 
 import streamlit as st
@@ -9,15 +8,14 @@ import sqlite3
 import os
 import pandas as pd
 import plotly.express as px
-import plotly.graph_objects as go
 
-from langchain_core.messages import HumanMessage, AIMessage, SystemMessage
+from langchain_core.messages import HumanMessage, AIMessage
 from nlq_agent import create_agent, run_query, DB_PATH, SCHEMA_DESCRIPTION
 
 # ── Page Config ──────────────────────────────────────────────────────────────
 
 st.set_page_config(
-    page_title="Chemlex Inventory NLQ Agent",
+    page_title="Chemlix Inventory NLQ Agent",
     page_icon="🏭",
     layout="wide",
     initial_sidebar_state="expanded",
@@ -89,26 +87,30 @@ st.markdown("""
 
 # ── Helper Functions ─────────────────────────────────────────────────────────
 
-@st.cache(ttl=60, allow_output_mutation=True)
+@st.cache_data(ttl=60)
 def get_db_stats():
     """Get database statistics for the dashboard."""
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
     stats = {}
-    cursor.execute("SELECT name FROM sqlite_master WHERE type='table'")
-    tables = [t[0] for t in cursor.fetchall()]
-    stats["tables"] = len(tables)
-    total_rows = 0
-    for t in tables:
-        cursor.execute(f'SELECT COUNT(*) FROM "{t}"')
-        total_rows += cursor.fetchone()[0]
-    stats["total_rows"] = total_rows
 
-    cursor.execute("SELECT COUNT(DISTINCT Material) FROM material_stock_requirement")
+    cursor.execute("SELECT COUNT(*) FROM current_inventory")
+    stats["total_rows"] = cursor.fetchone()[0]
+
+    cursor.execute("SELECT COUNT(DISTINCT Material) FROM current_inventory")
     stats["materials"] = cursor.fetchone()[0]
 
-    cursor.execute("SELECT COUNT(DISTINCT Plant) FROM material_stock_requirement")
+    cursor.execute("SELECT COUNT(DISTINCT Plant) FROM current_inventory")
     stats["plants"] = cursor.fetchone()[0]
+
+    cursor.execute("SELECT ROUND(SUM(Shelf_Stock_USD), 0) FROM current_inventory")
+    stats["total_shelf_usd"] = cursor.fetchone()[0] or 0
+
+    cursor.execute("SELECT COUNT(DISTINCT Material_Type) FROM current_inventory WHERE Material_Type IS NOT NULL")
+    stats["material_types"] = cursor.fetchone()[0]
+
+    cursor.execute("SELECT COUNT(DISTINCT Product_Family) FROM current_inventory WHERE Product_Family IS NOT NULL")
+    stats["product_families"] = cursor.fetchone()[0]
 
     conn.close()
     return stats
@@ -143,9 +145,8 @@ def auto_chart(df: pd.DataFrame):
     if df is None or df.empty:
         return None
 
-    cols = df.columns.tolist()
     num_cols = df.select_dtypes(include=["number"]).columns.tolist()
-    cat_cols = [c for c in cols if c not in num_cols]
+    cat_cols = [c for c in df.columns if c not in num_cols]
 
     if len(num_cols) >= 1 and len(cat_cols) >= 1:
         if len(df) <= 20:
@@ -194,25 +195,20 @@ with st.sidebar:
     if os.path.exists(DB_PATH):
         stats = get_db_stats()
         col1, col2 = st.columns(2)
-        col1.metric("Tables", stats["tables"])
-        col2.metric("Total Rows", f"{stats['total_rows']:,}")
-        col1.metric("Materials", f"{stats['materials']:,}")
-        col2.metric("Plants", stats["plants"])
+        col1.metric("Total Rows", f"{stats['total_rows']:,}")
+        col2.metric("Materials", f"{stats['materials']:,}")
+        col1.metric("Plants", stats["plants"])
+        col2.metric("Material Types", stats["material_types"])
 
         st.markdown("---")
-        st.markdown("### Tables")
+        st.markdown("### Table Schema")
         conn = sqlite3.connect(DB_PATH)
         cursor = conn.cursor()
-        cursor.execute("SELECT name FROM sqlite_master WHERE type='table'")
-        for t in cursor.fetchall():
-            tname = t[0]
-            cursor.execute(f'SELECT COUNT(*) FROM "{tname}"')
-            count = cursor.fetchone()[0]
-            with st.expander(f"{tname} ({count:,} rows)"):
-                cursor.execute(f'PRAGMA table_info("{tname}")')
-                cols = cursor.fetchall()
-                for c in cols:
-                    st.text(f"  {c[1]} ({c[2]})")
+        cursor.execute('PRAGMA table_info("current_inventory")')
+        cols = cursor.fetchall()
+        with st.expander(f"current_inventory ({stats['total_rows']:,} rows)"):
+            for c in cols:
+                st.text(f"  {c[1]} ({c[2]})")
         conn.close()
     else:
         st.warning("Database not found.")
@@ -221,12 +217,12 @@ with st.sidebar:
     if st.button("Clear Chat History"):
         st.session_state["messages"] = []
         st.session_state["chat_history"] = []
-        st.experimental_rerun()
+        st.rerun()
 
 
 # ── Main Content ─────────────────────────────────────────────────────────────
 
-st.markdown('<p class="main-header">Chemlex Inventory NLQ Agent</p>', unsafe_allow_html=True)
+st.markdown('<p class="main-header">Chemlix Inventory NLQ Agent</p>', unsafe_allow_html=True)
 st.markdown(
     '<p class="sub-header">Ask questions about your inventory data in plain English</p>',
     unsafe_allow_html=True,
@@ -235,21 +231,25 @@ st.markdown(
 # Database metrics row
 if os.path.exists(DB_PATH):
     stats = get_db_stats()
-    m1, m2, m3, m4 = st.columns(4)
+    m1, m2, m3, m4, m5 = st.columns(5)
     m1.markdown(
-        f'<div class="metric-card"><h3>Tables</h3><h2>{stats["tables"]}</h2></div>',
-        unsafe_allow_html=True,
-    )
-    m2.markdown(
         f'<div class="metric-card"><h3>Total Records</h3><h2>{stats["total_rows"]:,}</h2></div>',
         unsafe_allow_html=True,
     )
-    m3.markdown(
+    m2.markdown(
         f'<div class="metric-card"><h3>Materials</h3><h2>{stats["materials"]:,}</h2></div>',
         unsafe_allow_html=True,
     )
-    m4.markdown(
+    m3.markdown(
         f'<div class="metric-card"><h3>Plants</h3><h2>{stats["plants"]}</h2></div>',
+        unsafe_allow_html=True,
+    )
+    m4.markdown(
+        f'<div class="metric-card"><h3>Shelf Stock Value</h3><h2>${stats["total_shelf_usd"]:,.0f}</h2></div>',
+        unsafe_allow_html=True,
+    )
+    m5.markdown(
+        f'<div class="metric-card"><h3>Product Families</h3><h2>{stats["product_families"]}</h2></div>',
         unsafe_allow_html=True,
     )
 
@@ -258,16 +258,16 @@ st.markdown("---")
 # ── Sample Questions ─────────────────────────────────────────────────────────
 
 sample_questions = [
-    "How many unique materials are in each plant?",
-    "What is the total WIP value by plant?",
-    "Show me the top 10 materials by safety stock",
-    "Which materials have the highest customer order quantities?",
-    "What is the total ATP quantity by plant?",
-    "Who is responsible for the most materials?",
-    "Which work centers handle the most production orders?",
-    "Compare inflow vs outflow quantities by plant",
-    "What materials have WIP value greater than 100000?",
-    "Show monthly trends in planned independent requirements",
+    "What is the total shelf stock value by plant?",
+    "Show me top 10 materials by shelf stock dollar value",
+    "What is the ABC classification breakdown?",
+    "Which plants have the highest WIP value?",
+    "Show materials with DOH greater than 90 days",
+    "What is the total GIT value by product family?",
+    "Who are the top purchasing groups by inventory value?",
+    "Compare shelf stock vs safety stock by plant",
+    "Which material types have the most inventory?",
+    "Show demand vs shelf stock for top 10 materials",
 ]
 
 st.markdown("**Quick Questions:**")
@@ -308,26 +308,23 @@ for entry in st.session_state.messages:
             with st.expander("View Data Table"):
                 st.dataframe(entry["dataframe"])
         if "chart" in entry and entry["chart"] is not None:
-            st.plotly_chart(entry["chart"])
+            st.plotly_chart(entry["chart"], use_container_width=True)
 
 # Question input
 with st.form("question_form", clear_on_submit=True):
-    user_input = st.text_input(
-        "Ask a question about your inventory data",
-    )
+    user_input = st.text_input("Ask a question about your inventory data")
     submitted = st.form_submit_button("Ask")
 
 question = selected_sample or (user_input if submitted else None)
 
 if question:
-    # Add user message
     st.session_state.messages.append({"role": "user", "content": question})
     st.markdown(
         f'<div class="user-msg"><div class="msg-label user-label">You</div>{question}</div>',
         unsafe_allow_html=True,
     )
 
-    with st.spinner("Thinking... analyzing your question and querying the database..."):
+    with st.spinner("Analyzing your question and querying the database..."):
         try:
             agent = create_agent(model_choice)
             result_messages = run_query(agent, question, st.session_state.chat_history)
@@ -342,22 +339,18 @@ if question:
             if not final_answer:
                 final_answer = "I wasn't able to generate a response. Please try rephrasing your question."
 
-            # Extract SQL queries
             sql_queries = extract_sql_from_messages(result_messages)
             last_sql = sql_queries[-1] if sql_queries else None
 
-            # Display answer
             st.markdown(
                 f'<div class="bot-msg"><div class="msg-label bot-label">Agent</div>{final_answer}</div>',
                 unsafe_allow_html=True,
             )
 
-            # Show SQL
             if last_sql:
                 with st.expander("View SQL Query"):
                     st.code(last_sql, language="sql")
 
-            # Try to create chart
             df = None
             chart = None
             if last_sql:
@@ -367,9 +360,8 @@ if question:
                         st.dataframe(df)
                     chart = auto_chart(df)
                     if chart:
-                        st.plotly_chart(chart)
+                        st.plotly_chart(chart, use_container_width=True)
 
-            # Save to session
             st.session_state.messages.append({
                 "role": "assistant",
                 "content": final_answer,
@@ -378,11 +370,9 @@ if question:
                 "chart": chart,
             })
 
-            # Update chat history for context
             st.session_state.chat_history.append(HumanMessage(content=question))
             st.session_state.chat_history.append(AIMessage(content=final_answer))
 
-            # Keep chat history manageable
             if len(st.session_state.chat_history) > 20:
                 st.session_state.chat_history = st.session_state.chat_history[-20:]
 
@@ -399,7 +389,7 @@ with st.expander("Direct SQL Explorer"):
     st.markdown("Run custom SQL queries directly against the database.")
     custom_sql = st.text_area(
         "SQL Query",
-        value="SELECT Plant, COUNT(DISTINCT Material) as material_count\nFROM material_stock_requirement\nGROUP BY Plant\nORDER BY material_count DESC",
+        value="SELECT Plant, COUNT(DISTINCT Material) as material_count,\n       ROUND(SUM(Shelf_Stock_USD), 2) as total_shelf_value\nFROM current_inventory\nGROUP BY Plant\nORDER BY total_shelf_value DESC\nLIMIT 15",
         height=120,
     )
     if st.button("Run Query"):
@@ -411,7 +401,7 @@ with st.expander("Direct SQL Explorer"):
 
             chart = auto_chart(result_df)
             if chart:
-                st.plotly_chart(chart)
+                st.plotly_chart(chart, use_container_width=True)
         except Exception as e:
             st.error(f"Query error: {e}")
 
