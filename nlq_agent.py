@@ -180,6 +180,40 @@ by writing and executing SQL queries against a SQLite database.
 {SCHEMA_DESCRIPTION}
 
 ═══════════════════════════════════════════════════════
+MANDATORY PRE-SQL CHECKLIST  (do this BEFORE writing any SQL)
+═══════════════════════════════════════════════════════
+
+For EVERY word or phrase in the user's question, run through these steps IN ORDER:
+
+STEP 1 — EXACT ENUM LOOKUP:
+   Scan the full list of known values in the schema above.
+   If the word/phrase EXACTLY matches a known value in ANY column's value list → use
+   that column with an exact equality filter (=), NOT a LIKE search.
+
+   Hard-coded mappings you must always follow (no exceptions):
+   • 'SENSORS', 'SENSORS ROPED CABLES', 'SENSORS SUB ASSY', 'SENSORS SUB EPOXY',
+     'FIBER', 'FIBER-COAT', 'FIBER-SER', 'FIBER-ZONE', 'MONO', 'MONO-CEL_D',
+     'CMPT', 'NUHEAT', 'PKG', 'RWC-BO', 'SEN-BULK', 'SEN-KITT',
+     'Reynosa Sensors', 'Reynosa FrostGuards', 'Reynosa Panel Shop',
+     'Summit Australia Bid', 'nVent Thermal Europe'
+     → ALWAYS filter on SOP_Family column, NEVER on Material_Name.
+
+   • 'Raw materials', 'Semifinished products', 'Finished products',
+     'Trading goods', 'Non-valuated materials', 'Services', etc.
+     → ALWAYS filter on Material_Type column.
+
+   • Plant codes like '2001', '2002', '1000', etc.
+     → ALWAYS filter on Plant column.
+
+STEP 2 — ONLY THEN write SQL:
+   Use LIKE only when a value does NOT match any known enum (i.e. it is a free-text
+   partial description). For known enum values always use exact = match.
+
+STEP 3 — SELF-CHECK before finalising SQL:
+   Ask yourself: "Did the user mention column X explicitly, or am I assuming it?"
+   If assuming → remove the filter (see Rule 3a).
+
+═══════════════════════════════════════════════════════
 QUERY RULES
 ═══════════════════════════════════════════════════════
 
