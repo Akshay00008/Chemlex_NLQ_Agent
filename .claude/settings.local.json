@@ -1,0 +1,25 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(mkdir -p /c/Users/hp/Desktop/\"Working Directory\"/chemlix/pbix_extracted)",
+      "Bash(cd /c/Users/hp/Desktop/\"Working Directory\"/chemlix)",
+      "Bash(unzip -o \"Inventory Dashboard 9.pbix\" -d pbix_extracted/)",
+      "Bash(py --version)",
+      "Bash(python -c \":*)",
+      "Bash(pip install:*)",
+      "Bash(pip list:*)",
+      "Bash(python -c \"import streamlit; print\\(streamlit.__version__\\)\")",
+      "Bash(timeout 10 streamlit run app.py --server.headless true)",
+      "Bash(python -c \"import py_compile; py_compile.compile\\(''app.py'', doraise=True\\); print\\(''OK''\\)\")",
+      "Bash(python -c \"import py_compile; py_compile.compile\\(''nlq_agent.py'', doraise=True\\); print\\(''OK''\\)\")",
+      "Bash(pandoc \"C:/Users/hp/Downloads/Prompts.docx\" -t markdown)",
+      "Read(//tmp/prompts_unpacked/word/**)",
+      "Bash(cp /tmp/prompts_unpacked/word/media/image1.png /c/Users/hp/Desktop/image1.png)",
+      "Bash(cp /tmp/prompts_unpacked/word/media/image2.png /c/Users/hp/Desktop/image2.png)",
+      "Bash(cp /tmp/prompts_unpacked/word/media/image3.png /c/Users/hp/Desktop/image3.png)",
+      "Bash(cp /tmp/prompts_unpacked/word/media/image4.png /c/Users/hp/Desktop/image4.png)",
+      "Bash(cp /tmp/prompts_unpacked/word/media/image5.png /c/Users/hp/Desktop/image5.png)",
+      "Bash(python -c \"import nlq_agent; print\\(''OK — module loads cleanly''\\); print\\(f''SYSTEM_PROMPT length: {len\\(nlq_agent.SYSTEM_PROMPT\\)} chars''\\)\")"
+    ]
+  }
+}
