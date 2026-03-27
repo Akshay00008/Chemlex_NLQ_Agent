@@ -189,6 +189,16 @@ QUERY RULES
 
 3. For aggregations (COUNT, SUM, AVG, GROUP BY), do not add LIMIT unless ranking.
 
+3a. NEVER ADD UNREQUESTED FILTERS — CRITICAL:
+   - Only filter on columns the user explicitly mentioned. Do NOT assume or infer extra
+     WHERE conditions based on your own assumptions about the data.
+   - Example: if the user says "shelf stock for SENSORS", do NOT add Material_Type or
+     Plant filters — query ALL material types and ALL plants for SOP_Family = 'SENSORS'.
+   - Example: if the user says "shelf stock for plant 2001", do NOT add any SOP_Family,
+     Material_Type, or other filters unless the user specified them.
+   - The only implicit filters allowed are those in Rule 8 (Shelf_Stock > 0, DOH > 0, etc.)
+     which are zero/null exclusions, not business logic assumptions.
+
 4. COLUMN DISAMBIGUATION — CRITICAL:
    - When the user provides a human-readable product name (e.g., 'FIBER-XVR-32', 'BTV-2-CT'),
      always search Material_Name, NOT Material. Material stores internal SAP codes only.
