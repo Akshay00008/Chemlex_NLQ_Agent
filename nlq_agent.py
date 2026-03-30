@@ -171,6 +171,28 @@ DOMAIN CONTEXT
 - MRP = Material Requirements Planning (production/replenishment planning)
 - SOP = Sales & Operations Planning (demand/supply balancing)
 - Plant codes are numeric strings (e.g., '2001'), not integers
+
+═══════════════════════════════════════════════════════
+TOTAL INVENTORY DEFINITION — CRITICAL
+═══════════════════════════════════════════════════════
+When the user asks for "inventory", "total inventory", or "overall stock" (without specifying
+a single stock bucket like "shelf stock" or "GIT"), ALWAYS calculate inventory as:
+  Total Inventory = Shelf_Stock + COALESCE(GIT, 0) + COALESCE(WIP, 0)
+  Total Inventory USD = Shelf_Stock_USD + COALESCE(GIT_USD, 0) + COALESCE(WIPUSD, 0)
+
+Do NOT return only Shelf_Stock when the user says "inventory". Shelf_Stock alone is only
+correct when the user explicitly asks for "shelf stock" or "on-hand stock".
+
+Examples:
+  - "What is the inventory for material X?" →
+    SELECT Material_Name, Shelf_Stock, COALESCE(GIT,0) AS GIT, COALESCE(WIP,0) AS WIP,
+           (Shelf_Stock + COALESCE(GIT,0) + COALESCE(WIP,0)) AS Total_Inventory
+    FROM current_inventory WHERE ...
+  - "Total inventory by plant" →
+    SELECT Plant, SUM(Shelf_Stock) AS Shelf_Stock, SUM(COALESCE(GIT,0)) AS GIT,
+           SUM(COALESCE(WIP,0)) AS WIP,
+           SUM(Shelf_Stock + COALESCE(GIT,0) + COALESCE(WIP,0)) AS Total_Inventory
+    FROM current_inventory GROUP BY Plant
 """
 
 SYSTEM_PROMPT = f"""You are an expert inventory data analyst for a manufacturing company.
@@ -280,6 +302,36 @@ QUERY RULES
 12. Always provide business context with your answer — what the numbers mean operationally.
 
 13. For chart-worthy results (comparisons, rankings, trends), flag them so the UI can visualize.
+
+14. PLANT-WISE / GROUP-BY BREAKDOWNS — CRITICAL:
+   When the user asks for a breakdown "by plant", "plant-wise", "per plant", "segregated by plant",
+   or any similar phrasing, ALWAYS add GROUP BY "Plant" and include Plant in the SELECT.
+   This applies to ANY query — aggregations, category filters, SOP_Family filters, etc.
+   Examples:
+   - "total shelf stock for SENSORS by plants" →
+     SELECT "Plant", SUM("Shelf_Stock") AS Total_Shelf_Stock
+     FROM current_inventory WHERE "SOP_Family" = 'SENSORS' GROUP BY "Plant"
+   - "inventory for finished products plant-wise" →
+     SELECT "Plant", SUM("Shelf_Stock") AS Shelf_Stock, SUM(COALESCE("GIT",0)) AS GIT,
+            SUM(COALESCE("WIP",0)) AS WIP,
+            SUM("Shelf_Stock" + COALESCE("GIT",0) + COALESCE("WIP",0)) AS Total_Inventory
+     FROM current_inventory WHERE "Material_Type" = 'Finished products' GROUP BY "Plant"
+   Do NOT ignore the "by plant" part of the query. It is not optional.
+
+15. CONDITIONAL FILTERING — CRITICAL:
+   When the user specifies explicit conditions (e.g., "DOH > 20", "ABC class A",
+   "shelf stock above 200000"), you MUST translate ALL of them into WHERE clauses.
+   Never ignore or drop user-specified conditions. Every condition the user mentions
+   must appear in the SQL WHERE clause.
+   Examples:
+   - "Which materials have DOH > 20 and ABC class A" →
+     SELECT "Material_Name", "DOH", "ABC" FROM current_inventory
+     WHERE "DOH" > 20 AND "ABC" = 'A'
+   - "Show materials with shelf stock > 50000 in plant 2001" →
+     SELECT "Material_Name", "Shelf_Stock" FROM current_inventory
+     WHERE "Shelf_Stock" > 50000 AND "Plant" = '2001'
+   If the query combines multiple conditions, use AND to join them. Never substitute
+   the user's requested conditions with a different aggregation or generic query.
 """
 
 
