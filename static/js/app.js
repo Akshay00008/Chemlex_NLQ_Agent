@@ -6,6 +6,7 @@
 
 let currentConvoId = null;
 let isQuerying = false;
+let cachedKpis = null;
 
 // ── Init ─────────────────────────────────────────────────
 
@@ -14,6 +15,30 @@ document.addEventListener('DOMContentLoaded', () => {
     loadConversations();
     setupInput();
 });
+
+// ── Tab Switching ────────────────────────────────────────
+
+function switchTab(tab) {
+    document.getElementById('tabDashboard').classList.toggle('active', tab === 'dashboard');
+    document.getElementById('tabChat').classList.toggle('active', tab === 'chat');
+    document.getElementById('viewDashboard').classList.toggle('hidden', tab !== 'dashboard');
+    document.getElementById('viewChat').classList.toggle('hidden', tab !== 'chat');
+    document.getElementById('sidebar').classList.toggle('hidden', tab !== 'chat');
+
+    if (tab === 'dashboard') {
+        // Re-render charts when switching back (Plotly needs visible container)
+        setTimeout(() => {
+            if (cachedKpis) renderKPICharts(cachedKpis);
+        }, 50);
+    }
+
+    if (tab === 'chat') {
+        setTimeout(() => {
+            document.getElementById('chatInput').focus();
+            scrollToBottom();
+        }, 50);
+    }
+}
 
 // ── Input Setup ──────────────────────────────────────────
 
@@ -42,7 +67,9 @@ async function loadKPIs() {
         const resp = await fetch('/api/kpis');
         if (!resp.ok) throw new Error('Failed to load KPIs');
         const kpis = await resp.json();
+        cachedKpis = kpis;
         renderKPIs(kpis);
+        renderKPIStrip(kpis);
         renderKPICharts(kpis);
     } catch (err) {
         console.error('KPI load error:', err);
@@ -96,7 +123,40 @@ function renderKPIs(kpis) {
     `;
 }
 
+// Compact KPI strip for chat view
+function renderKPIStrip(kpis) {
+    const strip = document.getElementById('kpiStrip');
+    strip.innerHTML = `
+        <div class="kpi-chip">
+            <span class="chip-value">${formatCurrency(kpis.total_inventory_usd)}</span>
+            <span class="chip-label">Total Inventory</span>
+        </div>
+        <div class="kpi-chip">
+            <span class="chip-value">${kpis.active_plants}/${kpis.total_plants}</span>
+            <span class="chip-label">Active Plants</span>
+        </div>
+        <div class="kpi-chip">
+            <span class="chip-value">${formatNumber(kpis.plant_materials_with_stock)}</span>
+            <span class="chip-label">Stocked Items</span>
+        </div>
+        <div class="kpi-chip">
+            <span class="chip-value">${kpis.avg_doh}d</span>
+            <span class="chip-label">Avg DOH</span>
+        </div>
+        <div class="kpi-chip" style="border-color:#fecaca;">
+            <span class="chip-value" style="color:#dc2626;">${formatNumber(kpis.below_safety_stock)}</span>
+            <span class="chip-label">Below Safety Stock</span>
+        </div>
+    `;
+}
+
 function renderKPICharts(kpis) {
+    const chartLayout = {
+        paper_bgcolor: 'transparent',
+        plot_bgcolor: 'transparent',
+        font: { family: 'Inter' },
+    };
+
     // Top Plants Chart
     if (kpis.top_plants && kpis.top_plants.length > 0) {
         const plants = kpis.top_plants;
@@ -104,18 +164,13 @@ function renderKPICharts(kpis) {
             x: plants.map(p => 'Plant ' + p.plant),
             y: plants.map(p => p.value),
             type: 'bar',
-            marker: {
-                color: ['#004976', '#0a5c8f', '#1470a8', '#3b82f6', '#60a5fa'],
-                borderRadius: 4,
-            },
-            hovertemplate: 'Plant %{x}<br>$%{y:,.0f}<extra></extra>',
+            marker: { color: ['#004976', '#0a5c8f', '#1470a8', '#3b82f6', '#60a5fa'] },
+            hovertemplate: '%{x}<br>$%{y:,.0f}<extra></extra>',
         }], {
-            margin: { t: 8, r: 16, b: 40, l: 60 },
-            xaxis: { tickfont: { size: 11, family: 'Inter' } },
-            yaxis: { tickfont: { size: 11, family: 'Inter' }, tickformat: '$,.0s' },
-            paper_bgcolor: 'transparent',
-            plot_bgcolor: 'transparent',
-            font: { family: 'Inter' },
+            ...chartLayout,
+            margin: { t: 8, r: 16, b: 36, l: 56 },
+            xaxis: { tickfont: { size: 10, family: 'Inter' } },
+            yaxis: { tickfont: { size: 10, family: 'Inter' }, tickformat: '$,.0s' },
         }, { responsive: true, displayModeBar: false });
     }
 
@@ -127,23 +182,19 @@ function renderKPICharts(kpis) {
             values: mt.map(m => m.value),
             type: 'pie',
             hole: 0.45,
-            marker: {
-                colors: ['#004976', '#0a5c8f', '#3b82f6', '#60a5fa', '#93c5fd', '#dbeafe'],
-            },
+            marker: { colors: ['#004976', '#0a5c8f', '#3b82f6', '#60a5fa', '#93c5fd', '#dbeafe'] },
             textinfo: 'percent',
             textfont: { size: 11, family: 'Inter' },
             hovertemplate: '%{label}<br>$%{value:,.0f}<br>%{percent}<extra></extra>',
         }], {
+            ...chartLayout,
             margin: { t: 8, r: 8, b: 8, l: 8 },
-            paper_bgcolor: 'transparent',
-            plot_bgcolor: 'transparent',
-            font: { family: 'Inter' },
             showlegend: true,
-            legend: { font: { size: 10, family: 'Inter' }, orientation: 'h', y: -0.1 },
+            legend: { font: { size: 9, family: 'Inter' }, orientation: 'h', y: -0.15 },
         }, { responsive: true, displayModeBar: false });
     }
 
-    // Below Safety Stock by Plant Chart
+    // Below Safety Stock by Plant
     if (kpis.below_ss_by_plant && kpis.below_ss_by_plant.length > 0) {
         const ss = kpis.below_ss_by_plant;
         Plotly.newPlot('chartBelowSS', [{
@@ -152,22 +203,20 @@ function renderKPICharts(kpis) {
             type: 'bar',
             marker: {
                 color: ss.map((_, i) => {
-                    const colors = ['#dc2626', '#ef4444', '#f87171', '#fca5a5', '#fecaca', '#fee2e2', '#fef2f2', '#fff5f5'];
-                    return colors[i] || '#fecaca';
+                    const c = ['#dc2626', '#ef4444', '#f87171', '#fca5a5', '#fecaca', '#fee2e2', '#fef2f2', '#fff5f5'];
+                    return c[i] || '#fecaca';
                 }),
             },
             hovertemplate: '%{x}<br>%{y} items below safety stock<extra></extra>',
         }], {
-            margin: { t: 8, r: 16, b: 40, l: 50 },
+            ...chartLayout,
+            margin: { t: 8, r: 16, b: 36, l: 46 },
             xaxis: { tickfont: { size: 10, family: 'Inter' }, tickangle: -45 },
-            yaxis: { tickfont: { size: 11, family: 'Inter' }, title: { text: 'SKUs at risk', font: { size: 11 } } },
-            paper_bgcolor: 'transparent',
-            plot_bgcolor: 'transparent',
-            font: { family: 'Inter' },
+            yaxis: { tickfont: { size: 10, family: 'Inter' }, title: { text: 'SKUs at risk', font: { size: 10 } } },
         }, { responsive: true, displayModeBar: false });
     }
 
-    // Inventory Composition (Shelf vs GIT vs WIP)
+    // Inventory Composition
     if (kpis.shelf_stock_usd || kpis.git_usd || kpis.wip_usd) {
         Plotly.newPlot('chartComposition', [{
             labels: ['Shelf Stock', 'Goods In Transit', 'Work In Progress'],
@@ -179,10 +228,8 @@ function renderKPICharts(kpis) {
             textfont: { size: 11, family: 'Inter' },
             hovertemplate: '%{label}<br>$%{value:,.0f}<br>%{percent}<extra></extra>',
         }], {
+            ...chartLayout,
             margin: { t: 8, r: 8, b: 8, l: 8 },
-            paper_bgcolor: 'transparent',
-            plot_bgcolor: 'transparent',
-            font: { family: 'Inter' },
             showlegend: false,
         }, { responsive: true, displayModeBar: false });
     }
@@ -234,6 +281,9 @@ async function newConversation() {
 }
 
 async function loadConversation(id) {
+    // Switch to chat tab
+    switchTab('chat');
+
     try {
         currentConvoId = id;
         const resp = await fetch(`/api/conversations/${id}`);
@@ -246,7 +296,6 @@ async function loadConversation(id) {
             appendMessage(msg.role, msg.content, msg.sql, null, false);
         }
 
-        // Hide quick questions if conversation has messages
         document.getElementById('quickQuestions').style.display = msgs.length > 0 ? 'none' : 'block';
         loadConversations();
         scrollToBottom();
@@ -297,7 +346,6 @@ function appendMessage(role, content, sql, tableData, animate = true) {
             <div class="msg-bubble">${escapeHtml(content)}</div>
         `;
     } else {
-        // Parse markdown for assistant messages
         let htmlContent;
         try {
             htmlContent = marked.parse(content);
@@ -324,8 +372,6 @@ function appendMessage(role, content, sql, tableData, animate = true) {
         if (tableData && tableData.columns && tableData.rows && tableData.rows.length > 0) {
             const chartId = 'chart-' + Date.now() + Math.random().toString(36).slice(2, 6);
             chartHtml = `<div class="msg-chart" id="${chartId}"></div>`;
-
-            // Render chart after DOM update
             setTimeout(() => renderResultChart(chartId, tableData), 100);
         }
 
@@ -372,12 +418,10 @@ function renderResultChart(containerId, tableData) {
     const cols = tableData.columns;
     const rows = tableData.rows;
 
-    // Find numeric and categorical columns
     const numCols = [];
     const catCols = [];
     for (let i = 0; i < cols.length; i++) {
-        const sample = rows[0][i];
-        if (typeof sample === 'number') numCols.push(i);
+        if (typeof rows[0][i] === 'number') numCols.push(i);
         else catCols.push(i);
     }
 
@@ -386,16 +430,14 @@ function renderResultChart(containerId, tableData) {
         return;
     }
 
-    const trace = {
+    Plotly.newPlot(el, [{
         x: rows.map(r => r[catCols[0]]),
         y: rows.map(r => r[numCols[0]]),
         type: rows.length <= 20 ? 'bar' : 'scatter',
         mode: 'lines+markers',
         marker: { color: '#004976' },
         hovertemplate: '%{x}<br>%{y:,.2f}<extra></extra>',
-    };
-
-    Plotly.newPlot(el, [trace], {
+    }], {
         margin: { t: 10, r: 16, b: 40, l: 60 },
         xaxis: { tickfont: { size: 10, family: 'Inter' }, tickangle: -45 },
         yaxis: { tickfont: { size: 10, family: 'Inter' } },
@@ -413,12 +455,14 @@ async function handleSubmit(e) {
     const input = document.getElementById('chatInput');
     const question = input.value.trim();
     if (!question || isQuerying) return;
-
     await askQuestion(question);
 }
 
 async function askQuestion(question) {
     if (isQuerying) return;
+
+    // Switch to chat tab
+    switchTab('chat');
 
     const input = document.getElementById('chatInput');
     input.value = '';
@@ -437,10 +481,7 @@ async function askQuestion(question) {
         }
     }
 
-    // Hide quick questions
     document.getElementById('quickQuestions').style.display = 'none';
-
-    // Show user message
     appendMessage('user', question);
     showLoading();
 
@@ -465,8 +506,6 @@ async function askQuestion(question) {
 
         const data = await resp.json();
         appendMessage('assistant', data.answer, data.sql, data.table_data);
-
-        // Refresh conversation list (title may have updated)
         loadConversations();
 
     } catch (err) {
