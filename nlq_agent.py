@@ -161,7 +161,7 @@ COLUMN REFERENCE
 ═══════════════════════════════════════════════════════
 DOMAIN CONTEXT
 ═══════════════════════════════════════════════════════
-- This is a manufacturing/chemical company (nVent) inventory system
+- This is a Chemelex (formerly nVent Thermal Management) inventory system
 - Shelf Stock = physical inventory on hand at the plant
 - GIT = Goods In Transit (ordered from supplier, not yet received)
 - WIP = Work In Progress (being manufactured on the shop floor)
@@ -332,6 +332,33 @@ QUERY RULES
      WHERE "Shelf_Stock" > 50000 AND "Plant" = '2001'
    If the query combines multiple conditions, use AND to join them. Never substitute
    the user's requested conditions with a different aggregation or generic query.
+
+16. MATERIAL IS NOT UNIQUE — PLANT CONTEXT IS MANDATORY — CRITICAL:
+   Each row in current_inventory is a (Plant, Material) combination. The SAME material
+   can exist in MULTIPLE plants with completely different stock levels, safety stock,
+   DOH, etc. A material may be BELOW safety stock in one plant but SUFFICIENT in another.
+
+   Therefore:
+   - When listing materials (e.g., "show materials below safety stock", "top materials
+     by shelf stock", "materials with DOH > X"), you MUST ALWAYS include the "Plant"
+     column in your SELECT and results. Without Plant, the user cannot tell WHICH
+     plant the row refers to.
+   - When aggregating across all plants for a single material, use SUM/AVG with
+     GROUP BY "Material", "Material_Name" — but still show the aggregation is cross-plant.
+   - Example: "Which materials are below safety stock?" →
+     SELECT "Plant", "Material_Name", "Shelf_Stock", "Safety_Stock"
+     FROM current_inventory
+     WHERE "Safety_Stock" > 0 AND "Shelf_Stock" < "Safety_Stock"
+     ORDER BY ("Safety_Stock" - "Shelf_Stock") DESC LIMIT 50
+   - Example: "Top 10 materials by shelf stock value" →
+     SELECT "Plant", "Material_Name", "Shelf_Stock", "Shelf_Stock_USD"
+     FROM current_inventory
+     WHERE "Shelf_Stock" > 0
+     ORDER BY "Shelf_Stock_USD" DESC LIMIT 10
+
+   The ONLY exception is when the user explicitly asks for a cross-plant total
+   (e.g., "total shelf stock for material X across all plants") — then aggregate
+   but clearly state the result is a cross-plant sum.
 """
 
 
@@ -426,7 +453,7 @@ def create_agent(model_name: str = None):
     if not api_key or api_key == "your_openai_api_key_here":
         raise ValueError("Set OPENAI_API_KEY in .env file or Streamlit secrets")
     if model_name is None:
-        model_name = _get_secret("OPENAI_MODEL", "gpt-4o-mini")
+        model_name = _get_secret("OPENAI_MODEL", "gpt-4o")
     llm = ChatOpenAI(
         model=model_name,
         api_key=api_key,

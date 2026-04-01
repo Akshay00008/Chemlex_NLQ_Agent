@@ -1,0 +1,38 @@
+services:
+  # ── MongoDB ──────────────────────────────────
+  mongo:
+    image: mongo:7
+    container_name: chemlex-mongo
+    restart: unless-stopped
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo_data:/data/db
+    networks:
+      - chemlex-net
+
+  # ── Flask App ────────────────────────────────
+  app:
+    build: .
+    container_name: chemlex-app
+    restart: unless-stopped
+    ports:
+      - "5000:5000"
+    environment:
+      - MONGO_URI=mongodb://mongo:27017
+      - FLASK_SECRET_KEY=chemlex-inv-intel-2025-secret
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - OPENAI_MODEL=gpt-4o
+    volumes:
+      - ./inventory_data.db:/app/inventory_data.db:ro
+    depends_on:
+      - mongo
+    networks:
+      - chemlex-net
+
+volumes:
+  mongo_data:
+
+networks:
+  chemlex-net:
+    driver: bridge

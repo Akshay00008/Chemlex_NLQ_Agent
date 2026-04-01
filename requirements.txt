@@ -1,4 +1,6 @@
-streamlit
+flask
+pymongo
+werkzeug
 langchain
 langchain-community
 langchain-openai

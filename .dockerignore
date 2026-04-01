@@ -1,0 +1,11 @@
+__pycache__
+*.pyc
+.git
+.claude
+.env
+*.pbix
+pbix_extracted/
+pbix_schema.json
+.gitignore
+.dockerignore
+docker-compose.yml
