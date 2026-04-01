@@ -418,34 +418,49 @@ function renderResultChart(containerId, tableData) {
 
     const cols = tableData.columns;
     const rows = tableData.rows;
+    if (!rows || rows.length < 2) { el.remove(); return; }
 
+    // Identify columns — treat known identifier columns as categorical even if numeric
+    const catKeywords = ['plant', 'material', 'name', 'type', 'family', 'group', 'category',
+                         'abc', 'uom', 'controller', 'buyer', 'application', 'sop'];
     const numCols = [];
     const catCols = [];
+
     for (let i = 0; i < cols.length; i++) {
-        if (typeof rows[0][i] === 'number') numCols.push(i);
-        else catCols.push(i);
+        const colLower = cols[i].toLowerCase();
+        const isCatByName = catKeywords.some(k => colLower.includes(k));
+        const sample = rows[0][i];
+
+        if (isCatByName || typeof sample === 'string') {
+            catCols.push(i);
+        } else if (typeof sample === 'number') {
+            numCols.push(i);
+        } else {
+            catCols.push(i);
+        }
     }
 
-    if (numCols.length < 1 || catCols.length < 1 || rows.length < 2) {
-        el.remove();
-        return;
-    }
+    if (numCols.length < 1 || catCols.length < 1) { el.remove(); return; }
+
+    // Force x values to strings so Plotly treats them as categories
+    const xVals = rows.map(r => String(r[catCols[0]]));
+    const yVals = rows.map(r => r[numCols[0]]);
 
     Plotly.newPlot(el, [{
-        x: rows.map(r => r[catCols[0]]),
-        y: rows.map(r => r[numCols[0]]),
-        type: rows.length <= 20 ? 'bar' : 'scatter',
+        x: xVals,
+        y: yVals,
+        type: rows.length <= 25 ? 'bar' : 'scatter',
         mode: 'lines+markers',
         marker: { color: '#004976' },
         hovertemplate: '%{x}<br>%{y:,.2f}<extra></extra>',
     }], {
-        margin: { t: 10, r: 16, b: 40, l: 60 },
-        xaxis: { tickfont: { size: 10, family: 'Inter' }, tickangle: -45 },
+        margin: { t: 10, r: 16, b: 50, l: 70 },
+        xaxis: { type: 'category', tickfont: { size: 10, family: 'Inter' }, tickangle: -45 },
         yaxis: { tickfont: { size: 10, family: 'Inter' } },
         paper_bgcolor: 'transparent',
         plot_bgcolor: '#f9fafb',
         font: { family: 'Inter' },
-        height: 250,
+        height: 280,
     }, { responsive: true, displayModeBar: false });
 }
 
