@@ -6,6 +6,7 @@ Provides authentication, KPI endpoints, NLQ chat, and MongoDB-backed conversatio
 import os
 import sqlite3
 import secrets
+import math
 from datetime import datetime
 from functools import wraps
 
@@ -68,6 +69,21 @@ def serialize_doc(doc):
     if doc and "_id" in doc:
         doc["_id"] = str(doc["_id"])
     return doc
+
+
+def sanitize_for_json(obj):
+    """Replace NaN/Infinity with None so JSON serialization doesn't break."""
+    if isinstance(obj, float):
+        if math.isnan(obj) or math.isinf(obj):
+            return None
+        return obj
+    if isinstance(obj, dict):
+        return {k: sanitize_for_json(v) for k, v in obj.items()}
+    if isinstance(obj, (list, tuple)):
+        return [sanitize_for_json(v) for v in obj]
+    if isinstance(obj, datetime):
+        return obj.isoformat()
+    return obj
 
 
 # ── KPI Helper ───────────────────────────────────────────────────────────────
@@ -220,7 +236,7 @@ def api_logout():
 @app.route("/api/kpis")
 @login_required
 def api_kpis():
-    return jsonify(compute_kpis())
+    return jsonify(sanitize_for_json(compute_kpis()))
 
 
 # ── Conversation API ─────────────────────────────────────────────────────────
@@ -258,7 +274,7 @@ def create_conversation():
     }
     result = conversations_col.insert_one(doc)
     doc["_id"] = str(result.inserted_id)
-    return jsonify(doc), 201
+    return jsonify(sanitize_for_json(doc)), 201
 
 
 @app.route("/api/conversations/<convo_id>", methods=["GET"])
@@ -276,12 +292,7 @@ def get_conversation(convo_id):
         return jsonify({"error": "Not found"}), 404
 
     convo["_id"] = str(convo["_id"])
-    # Convert datetime objects in messages
-    for msg in convo.get("messages", []):
-        if isinstance(msg.get("timestamp"), datetime):
-            msg["timestamp"] = msg["timestamp"].isoformat()
-
-    return jsonify(convo)
+    return jsonify(sanitize_for_json(convo))
 
 
 @app.route("/api/conversations/<convo_id>", methods=["DELETE"])
@@ -358,10 +369,10 @@ def api_query():
                 df = pd.read_sql_query(last_sql, conn)
                 conn.close()
                 if not df.empty and len(df.columns) >= 2:
-                    table_data = {
+                    table_data = sanitize_for_json({
                         "columns": df.columns.tolist(),
                         "rows": df.values.tolist()[:100],
-                    }
+                    })
             except Exception:
                 pass
 
@@ -396,11 +407,11 @@ def api_query():
             except Exception:
                 pass
 
-        return jsonify({
+        return jsonify(sanitize_for_json({
             "answer": final_answer,
             "sql": last_sql,
             "table_data": table_data,
-        })
+        }))
 
     except Exception as e:
         return jsonify({"error": str(e)}), 500
