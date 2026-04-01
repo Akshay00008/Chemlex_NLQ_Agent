@@ -78,24 +78,20 @@ def compute_kpis():
 
     kpis = {}
 
-    # Total Inventory Value (Shelf + GIT + WIP)
-    c.execute("""
-        SELECT ROUND(SUM(Shelf_Stock_USD + COALESCE(GIT_USD, 0) + COALESCE(WIPUSD, 0)), 2)
-        FROM current_inventory
-    """)
-    kpis["total_inventory_usd"] = c.fetchone()[0] or 0
-
     # Shelf Stock Value
-    c.execute("SELECT ROUND(SUM(Shelf_Stock_USD), 2) FROM current_inventory")
+    c.execute("SELECT ROUND(SUM(COALESCE(Shelf_Stock_USD, 0)), 2) FROM current_inventory")
     kpis["shelf_stock_usd"] = c.fetchone()[0] or 0
 
     # GIT Value
-    c.execute("SELECT ROUND(SUM(GIT_USD), 2) FROM current_inventory")
+    c.execute("SELECT ROUND(SUM(COALESCE(GIT_USD, 0)), 2) FROM current_inventory")
     kpis["git_usd"] = c.fetchone()[0] or 0
 
     # WIP Value
-    c.execute("SELECT ROUND(SUM(WIPUSD), 2) FROM current_inventory")
+    c.execute("SELECT ROUND(SUM(COALESCE(WIPUSD, 0)), 2) FROM current_inventory")
     kpis["wip_usd"] = c.fetchone()[0] or 0
+
+    # Total Inventory Value (Shelf + GIT + WIP) — sum the individual parts
+    kpis["total_inventory_usd"] = round(kpis["shelf_stock_usd"] + kpis["git_usd"] + kpis["wip_usd"], 2)
 
     # Active Plants (plants with any stock > 0)
     c.execute("""
@@ -150,7 +146,7 @@ def compute_kpis():
     # Top 5 plants by inventory value
     c.execute("""
         SELECT Plant,
-               ROUND(SUM(Shelf_Stock_USD + COALESCE(GIT_USD, 0) + COALESCE(WIPUSD, 0)), 2) AS total
+               ROUND(SUM(COALESCE(Shelf_Stock_USD, 0) + COALESCE(GIT_USD, 0) + COALESCE(WIPUSD, 0)), 2) AS total
         FROM current_inventory
         GROUP BY Plant ORDER BY total DESC LIMIT 5
     """)
@@ -159,7 +155,7 @@ def compute_kpis():
     # Inventory by Material Type (top 6)
     c.execute("""
         SELECT Material_Type,
-               ROUND(SUM(Shelf_Stock_USD + COALESCE(GIT_USD, 0) + COALESCE(WIPUSD, 0)), 2) AS total
+               ROUND(SUM(COALESCE(Shelf_Stock_USD, 0) + COALESCE(GIT_USD, 0) + COALESCE(WIPUSD, 0)), 2) AS total
         FROM current_inventory
         WHERE Material_Type IS NOT NULL
         GROUP BY Material_Type ORDER BY total DESC LIMIT 6
