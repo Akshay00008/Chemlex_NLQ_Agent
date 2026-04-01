@@ -11,9 +11,10 @@ let cachedKpis = null;
 // ── Init ─────────────────────────────────────────────────
 
 document.addEventListener('DOMContentLoaded', () => {
-    loadKPIs();
+    // loadKPIs();  // Dashboard hidden for now
     loadConversations();
     setupInput();
+    document.getElementById('chatInput').focus();
 });
 
 // ── Tab Switching ────────────────────────────────────────

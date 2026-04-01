@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Chemelex - Inventory Intelligence</title>
+    <title>Chemelex - SIOP Control Tower</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
@@ -15,11 +15,13 @@
         <div class="nav-left">
             <div class="nav-logo">Chemelex</div>
             <span class="nav-divider"></span>
-            <span class="nav-title">Inventory Intelligence</span>
+            <span class="nav-title">SIOP Control Tower</span>
         </div>
         <div class="nav-center">
-            <button class="tab-btn active" id="tabDashboard" onclick="switchTab('dashboard')">Dashboard</button>
-            <button class="tab-btn" id="tabChat" onclick="switchTab('chat')">Chat</button>
+            <!-- Dashboard tab hidden for now — uncomment to re-enable
+            <button class="tab-btn" id="tabDashboard" onclick="switchTab('dashboard')">Dashboard</button>
+            <button class="tab-btn active" id="tabChat" onclick="switchTab('chat')">Chat</button>
+            -->
         </div>
         <div class="nav-right">
             <div class="nav-user">
@@ -48,8 +50,8 @@
             </div>
         </aside>
 
-        <!-- ══════ DASHBOARD VIEW ══════ -->
-        <main class="main-content view-dashboard" id="viewDashboard">
+        <!-- ══════ DASHBOARD VIEW (hidden for now) ══════ -->
+        <main class="main-content view-dashboard hidden" id="viewDashboard">
             <!-- KPI Cards Row -->
             <div class="kpi-bar">
                 <div class="kpi-grid" id="kpiGrid">
@@ -79,11 +81,10 @@
         </main>
 
         <!-- ══════ CHAT VIEW ══════ -->
-        <main class="main-content view-chat hidden" id="viewChat">
-            <!-- Compact KPI Strip -->
-            <div class="kpi-strip" id="kpiStrip">
-                <!-- Populated by JS -->
-            </div>
+        <main class="main-content view-chat" id="viewChat">
+            <!-- Compact KPI Strip (hidden for now — uncomment to re-enable)
+            <div class="kpi-strip" id="kpiStrip"></div>
+            -->
 
             <!-- Quick Questions -->
             <div class="quick-questions" id="quickQuestions">

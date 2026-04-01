@@ -24,7 +24,7 @@ DB_PATH = os.path.join(os.path.dirname(__file__), "inventory_data.db")
 SCHEMA_DESCRIPTION = """
 You have access to a Current Inventory SQLite database with one table:
 
-**current_inventory** (126,469 rows) — Current inventory snapshot across all plants
+**current_inventory** (126,634 rows) — Current inventory snapshot across all plants
 
 ═══════════════════════════════════════════════════════
 COLUMN REFERENCE
