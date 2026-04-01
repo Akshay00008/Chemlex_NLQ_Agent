@@ -20,14 +20,17 @@ document.addEventListener('DOMContentLoaded', () => {
 // ── Tab Switching ────────────────────────────────────────
 
 function switchTab(tab) {
-    document.getElementById('tabDashboard').classList.toggle('active', tab === 'dashboard');
-    document.getElementById('tabChat').classList.toggle('active', tab === 'chat');
-    document.getElementById('viewDashboard').classList.toggle('hidden', tab !== 'dashboard');
-    document.getElementById('viewChat').classList.toggle('hidden', tab !== 'chat');
+    const tabDash = document.getElementById('tabDashboard');
+    const tabChat = document.getElementById('tabChat');
+    if (tabDash) tabDash.classList.toggle('active', tab === 'dashboard');
+    if (tabChat) tabChat.classList.toggle('active', tab === 'chat');
+    const viewDash = document.getElementById('viewDashboard');
+    const viewChat = document.getElementById('viewChat');
+    if (viewDash) viewDash.classList.toggle('hidden', tab !== 'dashboard');
+    if (viewChat) viewChat.classList.toggle('hidden', tab !== 'chat');
     document.getElementById('sidebar').classList.toggle('hidden', tab !== 'chat');
 
-    if (tab === 'dashboard') {
-        // Re-render charts when switching back (Plotly needs visible container)
+    if (tab === 'dashboard' && viewDash && !viewDash.classList.contains('hidden')) {
         setTimeout(() => {
             if (cachedKpis) renderKPICharts(cachedKpis);
         }, 50);
@@ -282,9 +285,6 @@ async function newConversation() {
 }
 
 async function loadConversation(id) {
-    // Switch to chat tab
-    switchTab('chat');
-
     try {
         currentConvoId = id;
         const resp = await fetch(`/api/conversations/${id}`);
@@ -461,9 +461,6 @@ async function handleSubmit(e) {
 
 async function askQuestion(question) {
     if (isQuerying) return;
-
-    // Switch to chat tab
-    switchTab('chat');
 
     const input = document.getElementById('chatInput');
     input.value = '';
